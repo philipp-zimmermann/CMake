@@ -1,0 +1,51 @@
+function(target_exclude_from_property target property exclude_regex)
+  message(DEBUG "target_exclude_from_property target:${target}, property:${property}\
+      with regex: ${exclude_regex}")
+  get_target_property(definitions ${target} ${property})
+  list(FILTER definitions EXCLUDE REGEX ${exclude_regex})
+  set_property(TARGET ${target} PROPERTY ${property} ${definitions})
+endfunction()
+
+function(get_vars_with_prefix prefix_regex result_list)
+  get_cmake_property(vars VARIABLES)
+  string(REGEX MATCHALL "(^|;)${prefix_regex}[A-Za-z0-9_]*" matchedVars "${vars}")
+  set(${result_list} ${matchedVars} PARENT_SCOPE)
+endfunction()
+
+function(print_vars_with_prefix log_level prefix_regex)
+  get_vars_with_prefix(${prefix_regex} varList)
+  message(${log_level} "Variables with prefix_regex \"${prefix_regex}\" are:")
+  list(APPEND CMAKE_MESSAGE_INDENT " ")
+  foreach(var IN LISTS varList)
+    message(${log_level} "${var}=\"${${var}}\"")
+  endforeach()
+endfunction()
+
+function(print_target_properties target)
+  execute_process(COMMAND cmake --help-property-list OUTPUT_VARIABLE cmake_properties)
+  # Convert command output into a CMake list
+  string(REGEX REPLACE ";" "\\\\;" cmake_properties "${cmake_properties}")
+  string(REGEX REPLACE "\n" ";" cmake_properties "${cmake_properties}")
+  list(REMOVE_DUPLICATES cmake_properties)
+
+  if(NOT TARGET ${target})
+    message(STATUS "There is no target named '${target}'")
+    return()
+  endif()
+
+  get_target_property(target_type ${target} TYPE)
+
+  if(${target_type} MATCHES INTERFACE)
+    list(FILTER cmake_properties INCLUDE REGEX "^INTERFACE_.*")
+  endif()
+
+  message(STATUS "Non-empty properties for \"${target_type}\" \"${target}\"")
+  list(APPEND CMAKE_MESSAGE_INDENT " ")
+  foreach(prop ${cmake_properties})
+    string(REPLACE "<CONFIG>" "${CMAKE_BUILD_TYPE}" prop ${prop})
+    get_target_property(propval ${target} ${prop})
+    if(propval)
+      message(STATUS "${target} ${prop} = ${propval}")
+    endif()
+  endforeach()
+endfunction()
